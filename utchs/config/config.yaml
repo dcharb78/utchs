@@ -1,0 +1,91 @@
+# UTCHS Framework Configuration
+
+# System parameters
+system:
+  tick_interval: 0.1  # Time between ticks
+  cycles_per_structure: 7  # Number of cycles in a scaled structure
+  structures_per_torus: 7  # Number of scaled structures in a torus
+  history_length: 100  # Number of states to keep in history
+
+# Field parameters
+field:
+  grid_size: [50, 50, 50]  # Grid dimensions
+  grid_spacing: 0.1  # Grid spacing
+  initial_pattern: 'vortex'  # Initial phase field pattern (vortex, spiral, random)
+  initial_energy_pattern: 'toroidal'  # Initial energy field pattern (gaussian, toroidal, vortex, fibonacci)
+
+# Möbius transformation parameters
+mobius:
+  a_frequency: 0.01  # Frequency for parameter a
+  b_frequency: 0.02  # Frequency for parameter b
+  c_frequency: 0.03  # Frequency for parameter c
+  d_frequency: 0.01  # Frequency for parameter d
+  a_amplitude: 1.0  # Amplitude for parameter a
+  b_amplitude: 0.1  # Amplitude for parameter b
+  c_amplitude: 0.05  # Amplitude for parameter c
+  d_amplitude: 1.0  # Amplitude for parameter d
+
+# Energy field parameters
+energy:
+  history_length: 10  # Number of time steps to store
+  kernel_decay_exponent: 2.0  # Decay exponent for energy kernel
+  kernel_coupling_strength: 0.1  # Coupling strength
+  phi_coupling: 0.2  # Phase coupling strength
+  energy_conservation: false  # Whether to enforce energy conservation
+
+# Phase field parameters
+phase:
+  max_singularities: 50  # Maximum number of singularities to track
+  apply_constraints: true  # Whether to apply physical constraints
+  singularity_detection_threshold: 0.05  # Threshold for singularity detection
+
+# Recursion parameters
+recursion:
+  max_depth: 10  # Maximum recursion depth
+  golden_ratio: 1.618034  # Golden ratio value
+  prime_amplification: 1.2  # Amplification factor for prime positions
+
+# Visualization parameters
+visualization:
+  output_dir: 'visualizations'  # Output directory
+  fps: 15  # Frames per second for animations
+  color_map: 'viridis'  # Default color map
+  save_format: 'png'  # Default save format (png, svg, pdf)
+  dpi: 300  # Dots per inch for saved images
+  show_singularities: true  # Whether to show singularities in visualizations
+  show_lattice_points: true  # Whether to show lattice points in visualizations
+
+# Logging parameters
+logging:
+  level: 'INFO'  # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  file: 'logs/utchs_simulation.log'  # Log file path
+  console: true  # Whether to log to console
+  log_interval: 100  # Tick interval for regular logging
+
+# Storage parameters
+storage:
+  data_dir: 'data'  # Data directory
+  checkpoint_interval: 1000  # Ticks between checkpoints
+  compression: true  # Whether to compress saved data
+  save_format: 'npz'  # Save format (npz, hdf5)
+
+# Analysis parameters
+analysis:
+  perform_analysis_interval: 500  # Tick interval for analysis
+  save_analysis: true  # Whether to save analysis results
+  detailed_metrics: true  # Whether to calculate detailed metrics
+  resonance_threshold: 0.7  # Threshold for resonance detection
+  stability_threshold: 0.3  # Threshold for stability warning
+
+# Prime torsional anchors
+primes:
+  positions: [1, 2, 3, 5, 7, 11, 13]  # Prime positions
+  amplification: 1.5  # Energy amplification for prime positions
+  phase_factor: 1.2  # Phase stability factor for prime positions
+
+# Vortex parameters
+vortex:
+  positions: [3, 6, 9]  # Vortex positions
+  amplification: 1.3  # Energy amplification for vortex positions
+  phase_coupling: 1.5  # Enhanced phase coupling for vortex positions
+  resonance_factor: 2.0  # Resonance amplification for connections between vortex positions

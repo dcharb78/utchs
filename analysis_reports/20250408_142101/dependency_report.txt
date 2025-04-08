@@ -1,0 +1,466 @@
+Dependency Analysis Report
+==============================
+
+Module Dependencies:
+
+argparse:
+  Imported by:
+    - utchs.examples
+
+ast:
+  Imported by:
+    - utchs.utils
+
+cmath:
+  Imported by:
+    - utchs.math
+
+collections:
+  Imported by:
+    - utchs.fields
+    - utchs.utils
+
+core.position:
+  Imported by:
+    - utchs.math
+
+core.system:
+  Imported by:
+    - utchs
+    - utchs.tests
+
+core.torus:
+  Imported by:
+    - utchs
+    - utchs.core
+
+datetime:
+  Imported by:
+    - utchs.core
+    - utchs.docs
+    - utchs.examples
+    - utchs.scripts
+    - utchs.tests.unit
+    - utchs.utils
+    - utchs.visualization
+
+fields.energy_field:
+  Imported by:
+    - utchs
+    - utchs.core
+
+git:
+  Imported by:
+    - utchs.utils
+
+h5py:
+  Imported by:
+    - utchs.utils
+
+hashlib:
+  Imported by:
+    - utchs.utils
+
+json:
+  Imported by:
+    - utchs.scripts
+    - utchs.utils
+
+logging:
+  Imported by:
+    - utchs.core
+    - utchs.scripts
+    - utchs.utils
+
+logging.handlers:
+  Imported by:
+    - utchs.utils
+
+math.phase_field:
+  Imported by:
+    - utchs
+    - utchs.core
+
+matplotlib.animation:
+  Imported by:
+    - utchs.examples
+    - utchs.visualization
+
+matplotlib.colors:
+  Imported by:
+    - utchs.visualization
+
+matplotlib.patches:
+  Imported by:
+    - utchs.examples
+
+matplotlib.pyplot:
+  Imported by:
+    - utchs.examples
+    - utchs.utils
+    - utchs.visualization
+
+mobius:
+  Imported by:
+    - utchs.math
+
+mpl_toolkits.mplot3d:
+  Imported by:
+    - utchs.visualization
+
+networkx:
+  Imported by:
+    - utchs.utils
+    - utchs.visualization
+
+numpy:
+  Imported by:
+    - utchs.core
+    - utchs.examples
+    - utchs.fields
+    - utchs.math
+    - utchs.tests
+    - utchs.tests.benchmarks
+    - utchs.tests.integration
+    - utchs.tests.unit
+    - utchs.utils
+    - utchs.visualization
+
+numpy.typing:
+  Imported by:
+    - utchs.core
+    - utchs.math
+
+os:
+  Imported by:
+    - utchs.config
+    - utchs.core
+    - utchs.docs
+    - utchs.examples
+    - utchs.scripts
+    - utchs.tests.benchmarks
+    - utchs.tests.unit
+    - utchs.utils
+    - utchs.visualization
+
+pathlib:
+  Imported by:
+    - utchs.examples
+    - utchs.scripts
+    - utchs.tests.unit
+    - utchs.utils
+
+pickle:
+  Imported by:
+    - utchs.utils
+
+platform:
+  Imported by:
+    - utchs.utils
+
+psutil:
+  Imported by:
+    - utchs.tests.benchmarks
+
+pydantic:
+  Imported by:
+    - utchs.config
+    - utchs.utils
+
+pytest:
+  Imported by:
+    - utchs.tests
+    - utchs.tests.benchmarks
+    - utchs.tests.integration
+    - utchs.tests.unit
+
+random:
+  Imported by:
+    - utchs.utils
+
+re:
+  Imported by:
+    - utchs.utils
+
+shutil:
+  Imported by:
+    - utchs.tests.unit
+    - utchs.utils
+
+sys:
+  Imported by:
+    - utchs.docs
+    - utchs.examples
+    - utchs.scripts
+    - utchs.utils
+
+tempfile:
+  Imported by:
+    - utchs.tests.unit
+
+torch:
+  Imported by:
+    - utchs.utils
+
+typing:
+  Imported by:
+    - utchs.config
+    - utchs.core
+    - utchs.fields
+    - utchs.math
+    - utchs.scripts
+    - utchs.tests
+    - utchs.utils
+    - utchs.visualization
+
+utchs:
+  Imports:
+    - core.system
+    - core.torus
+    - fields.energy_field
+    - math.phase_field
+
+utchs.config:
+  Imports:
+    - os
+    - pydantic
+    - typing
+    - utchs.core.exceptions
+    - yaml
+  Imported by:
+    - utchs.examples
+    - utchs.tests.integration
+
+utchs.config.config_manager:
+  Imported by:
+    - utchs.examples
+    - utchs.tests.unit
+
+utchs.core:
+  Imports:
+    - core.torus
+    - datetime
+    - fields.energy_field
+    - logging
+    - math.phase_field
+    - numpy
+    - numpy.typing
+    - os
+    - typing
+    - utchs.core.cycle
+    - utchs.core.position
+    - utchs.core.structure
+    - utils.logging_config
+
+utchs.core.cycle:
+  Imported by:
+    - utchs.core
+
+utchs.core.exceptions:
+  Imported by:
+    - utchs.config
+    - utchs.examples
+    - utchs.tests.unit
+    - utchs.utils
+
+utchs.core.position:
+  Imported by:
+    - utchs.core
+
+utchs.core.structure:
+  Imported by:
+    - utchs.core
+
+utchs.core.system:
+  Imported by:
+    - utchs.examples
+    - utchs.tests.integration
+
+utchs.docs:
+  Imports:
+    - datetime
+    - os
+    - sys
+
+utchs.examples:
+  Imports:
+    - argparse
+    - datetime
+    - matplotlib.animation
+    - matplotlib.patches
+    - matplotlib.pyplot
+    - numpy
+    - os
+    - pathlib
+    - sys
+    - utchs.config
+    - utchs.config.config_manager
+    - utchs.core.exceptions
+    - utchs.core.system
+    - utchs.visualization.field_vis
+    - utchs.visualization.torus_vis
+    - yaml
+
+utchs.fields:
+  Imports:
+    - collections
+    - numpy
+    - typing
+
+utchs.fields.phase_field:
+  Imported by:
+    - utchs.tests.benchmarks
+    - utchs.tests.integration
+    - utchs.tests.unit
+
+utchs.math:
+  Imports:
+    - cmath
+    - core.position
+    - mobius
+    - numpy
+    - numpy.typing
+    - typing
+    - utils.logging_config
+
+utchs.math.mobius:
+  Imported by:
+    - utchs.tests.benchmarks
+    - utchs.tests.integration
+    - utchs.tests.unit
+
+utchs.scripts:
+  Imports:
+    - datetime
+    - json
+    - logging
+    - os
+    - pathlib
+    - sys
+    - typing
+    - utchs.utils.dependency_analyzer
+    - utchs.utils.naming_checker
+    - utchs.utils.validation_registry
+
+utchs.tests:
+  Imports:
+    - core.system
+    - numpy
+    - pytest
+    - typing
+
+utchs.tests.benchmarks:
+  Imports:
+    - numpy
+    - os
+    - psutil
+    - pytest
+    - utchs.fields.phase_field
+    - utchs.math.mobius
+
+utchs.tests.integration:
+  Imports:
+    - numpy
+    - pytest
+    - utchs.config
+    - utchs.core.system
+    - utchs.fields.phase_field
+    - utchs.math.mobius
+
+utchs.tests.unit:
+  Imports:
+    - datetime
+    - numpy
+    - os
+    - pathlib
+    - pytest
+    - shutil
+    - tempfile
+    - utchs.config.config_manager
+    - utchs.core.exceptions
+    - utchs.fields.phase_field
+    - utchs.math.mobius
+    - utchs.utils.model_registry
+
+utchs.utils:
+  Imports:
+    - ast
+    - collections
+    - datetime
+    - git
+    - h5py
+    - hashlib
+    - json
+    - logging
+    - logging.handlers
+    - matplotlib.pyplot
+    - networkx
+    - numpy
+    - os
+    - pathlib
+    - pickle
+    - platform
+    - pydantic
+    - random
+    - re
+    - shutil
+    - sys
+    - torch
+    - typing
+    - utchs.core.exceptions
+    - utchs.utils.data_manager
+    - uuid
+
+utchs.utils.data_manager:
+  Imported by:
+    - utchs.utils
+
+utchs.utils.dependency_analyzer:
+  Imported by:
+    - utchs.scripts
+
+utchs.utils.model_registry:
+  Imported by:
+    - utchs.tests.unit
+
+utchs.utils.naming_checker:
+  Imported by:
+    - utchs.scripts
+
+utchs.utils.validation_registry:
+  Imported by:
+    - utchs.scripts
+
+utchs.visualization:
+  Imports:
+    - datetime
+    - matplotlib.animation
+    - matplotlib.colors
+    - matplotlib.pyplot
+    - mpl_toolkits.mplot3d
+    - networkx
+    - numpy
+    - os
+    - typing
+
+utchs.visualization.field_vis:
+  Imported by:
+    - utchs.examples
+
+utchs.visualization.torus_vis:
+  Imported by:
+    - utchs.examples
+
+utils.logging_config:
+  Imported by:
+    - utchs.core
+    - utchs.math
+
+uuid:
+  Imported by:
+    - utchs.utils
+
+yaml:
+  Imported by:
+    - utchs.config
+    - utchs.examples

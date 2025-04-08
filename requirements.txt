@@ -1,0 +1,6 @@
+pydantic>=2.0.0
+numpy>=1.20.0
+matplotlib>=3.4.0
+networkx>=2.6.0
+pytest>=6.0.0
+mypy>=0.900 

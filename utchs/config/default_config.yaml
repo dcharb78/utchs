@@ -1,0 +1,24 @@
+# System parameters
+dimensions: 3
+periodic_boundary: true
+lattice_size: 100
+time_steps: 1000
+temperature: 0.1
+
+# Field parameters
+field_type: "phase"
+field_parameters:
+  amplitude: 1.0
+  phase: 0.0
+  wavelength: 1.0
+  damping: 0.1
+
+# Output parameters
+output_dir: "output"
+save_interval: 100
+log_level: "INFO"
+
+# Performance parameters
+num_threads: 1
+use_gpu: false
+batch_size: 32 
