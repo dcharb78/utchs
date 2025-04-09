@@ -61,9 +61,9 @@ class MetaPatternDetector:
                    f"{self.max_recursion_order}")
     
     def detect_meta_patterns(self, 
-                            position_history: Dict[int, List[Dict]], 
-                            recursion_order: int = 2,
-                            config: Optional[Dict[str, Any]] = None) -> Dict:
+                             position_history: Dict[int, List[Dict]], 
+                             recursion_order: int = 2,
+                             config: Optional[Dict[str, Any]] = None) -> Dict:
         """
         Detect meta-patterns in position history data at a specific recursion order.
         
@@ -74,6 +74,106 @@ class MetaPatternDetector:
             
         Returns:
             Dictionary with meta-pattern metrics
+        """
+        config = config or self.config
+        
+        # Calculate meta-positions for this recursion order
+        meta3_cycle = self._calculate_meta_position_cycle(3, recursion_order)
+        meta6_cycle = self._calculate_meta_position_cycle(6, recursion_order)
+        meta9_cycle = self._calculate_meta_position_cycle(9, recursion_order)
+        
+        logger.debug(f"Detecting meta-patterns at recursion order {recursion_order} " +
+                    f"with cycles: {meta3_cycle}, {meta6_cycle}, {meta9_cycle}")
+        
+        # Get positions from corresponding cycles
+        meta3_positions = self._extract_cycle_positions(position_history, meta3_cycle)
+        meta6_positions = self._extract_cycle_positions(position_history, meta6_cycle)
+        meta9_positions = self._extract_cycle_positions(position_history, meta9_cycle)
+        
+        # Get original or lower meta-positions for comparison
+        original_position3 = self._get_meta_position_data(position_history, 3, recursion_order-1)
+        original_position6 = self._get_meta_position_data(position_history, 6, recursion_order-1)
+        original_position9 = self._get_meta_position_data(position_history, 9, recursion_order-1)
+        
+        # Calculate correlations between meta-positions and their "originals"
+        meta3_correlation = self._calculate_meta_correlation(original_position3, meta3_positions)
+        meta6_correlation = self._calculate_meta_correlation(original_position6, meta6_positions)
+        meta9_correlation = self._calculate_meta_correlation(original_position9, meta9_positions)
+        
+        # Calculate overall meta-pattern strength
+        meta_cycle_strength = self._calculate_meta_cycle_strength(
+            meta3_correlation, meta6_correlation, meta9_correlation
+        )
+        
+        # Check if we have a valid meta-pattern at this recursion order
+        has_meta_pattern = meta_cycle_strength > config.get('meta_pattern_threshold', 0.7)
+        
+        # Store results
+        result = {
+            'detected': has_meta_pattern,
+            'recursion_order': recursion_order,
+            'meta_cycle_strength': meta_cycle_strength,
+            'meta3_cycle': meta3_cycle,
+            'meta6_cycle': meta6_cycle,
+            'meta9_cycle': meta9_cycle,
+            'meta3_correlation': meta3_correlation,
+            'meta6_correlation': meta6_correlation,
+            'meta9_correlation': meta9_correlation,
+            'meta3_data': {
+                'count': len(meta3_positions),
+                'phase_coherence': self._calculate_phase_coherence(meta3_positions),
+                'energy_pattern': self._extract_energy_pattern(meta3_positions)
+            },
+            'meta6_data': {
+                'count': len(meta6_positions),
+                'phase_coherence': self._calculate_phase_coherence(meta6_positions),
+                'energy_pattern': self._extract_energy_pattern(meta6_positions)
+            },
+            'meta9_data': {
+                'count': len(meta9_positions),
+                'phase_coherence': self._calculate_phase_coherence(meta9_positions),
+                'energy_pattern': self._extract_energy_pattern(meta9_positions)
+            }
+        }
+        
+        # Store detected pattern for later analysis
+        if has_meta_pattern:
+            self.detected_meta_patterns[recursion_order]['cycle_patterns'][meta3_cycle].append(result['meta3_data'])
+            self.detected_meta_patterns[recursion_order]['cycle_patterns'][meta6_cycle].append(result['meta6_data'])
+            self.detected_meta_patterns[recursion_order]['cycle_patterns'][meta9_cycle].append(result['meta9_data'])
+            
+            pattern_idx = self.detected_meta_patterns[recursion_order]['patterns_detected']
+            self.detected_meta_patterns[recursion_order]['cross_scale_correlations'][pattern_idx] = {
+                'meta3': meta3_correlation,
+                'meta6': meta6_correlation,
+                'meta9': meta9_correlation
+            }
+            self.detected_meta_patterns[recursion_order]['patterns_detected'] += 1
+            
+            logger.info(f"Detected meta-pattern at recursion order {recursion_order} " +
+                       f"with strength {meta_cycle_strength:.4f}")
+        
+        return result
+    
+    def detect_dimensional_systems(self, 
+                             position_history: Dict[int, List[Dict]], 
+                             recursion_order: int = 2,
+                             config: Optional[Dict[str, Any]] = None) -> Dict:
+        """
+        Detect complete 13D systems generated at a specific recursion order.
+        
+        This method identifies the emergence of entire new 13D systems generated
+        by the 3-6-9 pattern at different recursion orders. Each new system contains
+        a complete set of 13 positions functioning as a coherent dimensional framework.
+        
+        Args:
+            position_history: Dictionary of position history by recursion depth
+            recursion_order: Order of dimensional system to detect 
+                             (1=base system, 2=first nested system at cycle 6, etc.)
+            config: Configuration dictionary (optional)
+            
+        Returns:
+            Dictionary with metrics about the detected dimensional system
         """
         config = config or self.config
         
