@@ -7,7 +7,7 @@ across multiple scales with cycle 6 as a key transition point.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 import logging
 from collections import defaultdict
 from scipy.stats import entropy
@@ -23,7 +23,8 @@ class MetaPatternDetector:
     
     This class focuses on identifying the recursive 3-6-9 pattern that emerges at cycle 6,
     where cycle 6 becomes a "meta-position 3" in a higher-order pattern that includes
-    cycles 9 (meta-position 6) and 12 (meta-position 9).
+    cycles 9 (meta-position 6) and 12 (meta-position 9). This pattern can continue
+    recursively at higher levels, creating patterns within patterns within patterns.
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -43,23 +44,32 @@ class MetaPatternDetector:
         # Golden ratio (φ) for resonance detection
         self.phi = (1 + np.sqrt(5)) / 2
         
-        # Storage for detected patterns
-        self.detected_meta_patterns = {
-            'cycle6_patterns': [],  # Meta-position 3
-            'cycle9_patterns': [],  # Meta-position 6
-            'cycle12_patterns': [],  # Meta-position 9
-            'cross_scale_correlations': {},
-            'meta_cycles_detected': 0
-        }
+        # Maximum recursion order to check (how many levels of meta-patterns)
+        self.max_recursion_order = self.config.get('max_recursion_order', 5)
         
-        logger.info("MetaPatternDetector initialized")
+        # Storage for detected patterns at different recursion levels
+        self.detected_meta_patterns = defaultdict(lambda: {
+            'cycle_patterns': defaultdict(list),   # Meta-position patterns by cycle
+            'cross_scale_correlations': {},        # Correlations between levels
+            'patterns_detected': 0                 # Count of patterns at this level
+        })
+        
+        # Storage for propagation analysis
+        self.pattern_propagation = defaultdict(list)
+        
+        logger.info("MetaPatternDetector initialized with max recursion order: " + 
+                   f"{self.max_recursion_order}")
     
-    def detect_meta_patterns(self, position_history: Dict[int, List[Dict]], config: Optional[Dict[str, Any]] = None) -> Dict:
+    def detect_meta_patterns(self, 
+                            position_history: Dict[int, List[Dict]], 
+                            recursion_order: int = 2,
+                            config: Optional[Dict[str, Any]] = None) -> Dict:
         """
-        Detect meta-patterns in position history data.
+        Detect meta-patterns in position history data at a specific recursion order.
         
         Args:
             position_history: Dictionary of position history by recursion depth
+            recursion_order: Order of meta-pattern to detect (2=cycle 6 as meta-3, etc.)
             config: Configuration dictionary (optional)
             
         Returns:
@@ -67,113 +77,161 @@ class MetaPatternDetector:
         """
         config = config or self.config
         
-        # Extract cycle 6 positions (meta-position 3)
-        cycle6_positions = self._extract_cycle_positions(position_history, 6)
+        # Calculate meta-positions for this recursion order
+        meta3_cycle = self._calculate_meta_position_cycle(3, recursion_order)
+        meta6_cycle = self._calculate_meta_position_cycle(6, recursion_order)
+        meta9_cycle = self._calculate_meta_position_cycle(9, recursion_order)
         
-        # Extract original position 3 data for comparison
-        position3_data = self._extract_position_data(position_history, 3)
+        logger.debug(f"Detecting meta-patterns at recursion order {recursion_order} " +
+                    f"with cycles: {meta3_cycle}, {meta6_cycle}, {meta9_cycle}")
         
-        # Calculate correlations between position 3 and cycle 6
-        meta3_correlation = self._calculate_meta_correlation(position3_data, cycle6_positions)
+        # Get positions from corresponding cycles
+        meta3_positions = self._extract_cycle_positions(position_history, meta3_cycle)
+        meta6_positions = self._extract_cycle_positions(position_history, meta6_cycle)
+        meta9_positions = self._extract_cycle_positions(position_history, meta9_cycle)
         
-        # Extract cycle 9 positions (meta-position 6)
-        cycle9_positions = self._extract_cycle_positions(position_history, 9)
+        # Get original or lower meta-positions for comparison
+        original_position3 = self._get_meta_position_data(position_history, 3, recursion_order-1)
+        original_position6 = self._get_meta_position_data(position_history, 6, recursion_order-1)
+        original_position9 = self._get_meta_position_data(position_history, 9, recursion_order-1)
         
-        # Extract original position 6 data for comparison
-        position6_data = self._extract_position_data(position_history, 6)
-        
-        # Calculate correlations between position 6 and cycle 9
-        meta6_correlation = self._calculate_meta_correlation(position6_data, cycle9_positions)
-        
-        # Extract cycle 12 positions (meta-position 9)
-        cycle12_positions = self._extract_cycle_positions(position_history, 12)
-        
-        # Extract original position 9 data for comparison
-        position9_data = self._extract_position_data(position_history, 9)
-        
-        # Calculate correlations between position 9 and cycle 12
-        meta9_correlation = self._calculate_meta_correlation(position9_data, cycle12_positions)
+        # Calculate correlations between meta-positions and their "originals"
+        meta3_correlation = self._calculate_meta_correlation(original_position3, meta3_positions)
+        meta6_correlation = self._calculate_meta_correlation(original_position6, meta6_positions)
+        meta9_correlation = self._calculate_meta_correlation(original_position9, meta9_positions)
         
         # Calculate overall meta-pattern strength
         meta_cycle_strength = self._calculate_meta_cycle_strength(
             meta3_correlation, meta6_correlation, meta9_correlation
         )
         
-        # Check if we have a valid meta-pattern
+        # Check if we have a valid meta-pattern at this recursion order
         has_meta_pattern = meta_cycle_strength > config.get('meta_pattern_threshold', 0.7)
         
         # Store results
         result = {
             'detected': has_meta_pattern,
+            'recursion_order': recursion_order,
             'meta_cycle_strength': meta_cycle_strength,
-            'position3_cycle6_correlation': meta3_correlation,
-            'position6_cycle9_correlation': meta6_correlation,
-            'position9_cycle12_correlation': meta9_correlation,
-            'cycle6_meta_position3_data': {
-                'count': len(cycle6_positions),
-                'phase_coherence': self._calculate_phase_coherence(cycle6_positions),
-                'energy_pattern': self._extract_energy_pattern(cycle6_positions)
+            'meta3_cycle': meta3_cycle,
+            'meta6_cycle': meta6_cycle,
+            'meta9_cycle': meta9_cycle,
+            'meta3_correlation': meta3_correlation,
+            'meta6_correlation': meta6_correlation,
+            'meta9_correlation': meta9_correlation,
+            'meta3_data': {
+                'count': len(meta3_positions),
+                'phase_coherence': self._calculate_phase_coherence(meta3_positions),
+                'energy_pattern': self._extract_energy_pattern(meta3_positions)
             },
-            'cycle9_meta_position6_data': {
-                'count': len(cycle9_positions),
-                'phase_coherence': self._calculate_phase_coherence(cycle9_positions),
-                'energy_pattern': self._extract_energy_pattern(cycle9_positions)
+            'meta6_data': {
+                'count': len(meta6_positions),
+                'phase_coherence': self._calculate_phase_coherence(meta6_positions),
+                'energy_pattern': self._extract_energy_pattern(meta6_positions)
             },
-            'cycle12_meta_position9_data': {
-                'count': len(cycle12_positions),
-                'phase_coherence': self._calculate_phase_coherence(cycle12_positions),
-                'energy_pattern': self._extract_energy_pattern(cycle12_positions)
+            'meta9_data': {
+                'count': len(meta9_positions),
+                'phase_coherence': self._calculate_phase_coherence(meta9_positions),
+                'energy_pattern': self._extract_energy_pattern(meta9_positions)
             }
         }
         
         # Store detected pattern for later analysis
         if has_meta_pattern:
-            self.detected_meta_patterns['cycle6_patterns'].append(result['cycle6_meta_position3_data'])
-            self.detected_meta_patterns['cycle9_patterns'].append(result['cycle9_meta_position6_data'])
-            self.detected_meta_patterns['cycle12_patterns'].append(result['cycle12_meta_position9_data'])
-            self.detected_meta_patterns['cross_scale_correlations'][len(self.detected_meta_patterns['cycle6_patterns'])] = {
+            self.detected_meta_patterns[recursion_order]['cycle_patterns'][meta3_cycle].append(result['meta3_data'])
+            self.detected_meta_patterns[recursion_order]['cycle_patterns'][meta6_cycle].append(result['meta6_data'])
+            self.detected_meta_patterns[recursion_order]['cycle_patterns'][meta9_cycle].append(result['meta9_data'])
+            
+            pattern_idx = self.detected_meta_patterns[recursion_order]['patterns_detected']
+            self.detected_meta_patterns[recursion_order]['cross_scale_correlations'][pattern_idx] = {
                 'meta3': meta3_correlation,
                 'meta6': meta6_correlation,
                 'meta9': meta9_correlation
             }
-            self.detected_meta_patterns['meta_cycles_detected'] += 1
+            self.detected_meta_patterns[recursion_order]['patterns_detected'] += 1
             
-            logger.info(f"Detected meta-pattern at cycle 6 with strength {meta_cycle_strength:.4f}")
+            logger.info(f"Detected meta-pattern at recursion order {recursion_order} " +
+                       f"with strength {meta_cycle_strength:.4f}")
         
         return result
     
-    def analyze_cycle6_meta_transition(self, position_history: Dict[int, List[Dict]]) -> Dict:
+    def detect_all_meta_patterns(self, position_history: Dict[int, List[Dict]]) -> Dict[int, Dict]:
         """
-        Perform detailed analysis of the cycle 6 meta-transition.
+        Detect meta-patterns at all recursion orders up to max_recursion_order.
         
         Args:
             position_history: Dictionary of position history by recursion depth
             
         Returns:
+            Dictionary of meta-pattern results by recursion order
+        """
+        all_results = {}
+        
+        # First, detect the base-level 3-6-9 pattern (order 1)
+        base_pattern = self._analyze_base_pattern(position_history)
+        all_results[1] = base_pattern
+        
+        # Then detect higher-order meta-patterns
+        for order in range(2, self.max_recursion_order + 1):
+            result = self.detect_meta_patterns(position_history, order)
+            all_results[order] = result
+            
+            # If we don't detect a pattern at this level, unlikely to find at higher levels
+            if not result['detected'] and self.config.get('stop_at_first_missing', True):
+                logger.info(f"No meta-pattern detected at order {order}, stopping detection")
+                break
+        
+        # Analyze propagation between levels
+        self._analyze_pattern_propagation(all_results)
+        
+        return all_results
+    
+    def analyze_cycle_meta_transition(self, 
+                                     position_history: Dict[int, List[Dict]],
+                                     cycle: int,
+                                     recursion_order: int = 2) -> Dict:
+        """
+        Perform detailed analysis of a specific meta-transition at any cycle.
+        
+        Args:
+            position_history: Dictionary of position history by recursion depth
+            cycle: Cycle number to analyze
+            recursion_order: Recursion order to which this cycle belongs
+            
+        Returns:
             Dictionary with detailed transition metrics
         """
-        # Extract cycle 6 data
-        cycle6_positions = self._extract_cycle_positions(position_history, 6)
+        # Extract cycle data
+        cycle_positions = self._extract_cycle_positions(position_history, cycle)
         
-        if not cycle6_positions:
-            return {'detected': False, 'message': 'No cycle 6 data available'}
+        if not cycle_positions:
+            return {'detected': False, 'message': f'No cycle {cycle} data available'}
         
         # Sort by tick
-        cycle6_positions.sort(key=lambda x: x['tick'])
+        cycle_positions.sort(key=lambda x: x['tick'])
         
         # Calculate phase shifts between consecutive ticks
         phase_shifts = []
-        for i in range(1, len(cycle6_positions)):
-            shift = cycle6_positions[i]['phase'] - cycle6_positions[i-1]['phase']
+        for i in range(1, len(cycle_positions)):
+            shift = cycle_positions[i]['phase'] - cycle_positions[i-1]['phase']
             # Normalize to [-π, π]
             phase_shifts.append(np.arctan2(np.sin(shift), np.cos(shift)))
         
-        # Detect resonance with position 3
-        position3_data = self._extract_position_data(position_history, 3)
-        position3_resonance = self._detect_position_resonance(cycle6_positions, position3_data)
+        # Determine which base position this cycle corresponds to in the meta-pattern
+        meta_position = self._determine_meta_position(cycle, recursion_order)
+        
+        # Get original position data for comparison
+        original_position_data = self._get_meta_position_data(
+            position_history, meta_position, recursion_order-1
+        )
+        
+        # Detect resonance with original position
+        position_resonance = self._detect_position_resonance(
+            cycle_positions, original_position_data
+        )
         
         # Analyze energy evolution pattern
-        energy_values = [p['energy_level'] for p in cycle6_positions]
+        energy_values = [p['energy_level'] for p in cycle_positions]
         energy_pattern = self._analyze_energy_evolution(energy_values)
         
         # Check for phi resonance in energy ratios
@@ -184,52 +242,306 @@ class MetaPatternDetector:
         
         # Check for characteristic meta-pattern emergence signature
         meta_signature = self._detect_meta_signature(
-            phase_shifts, position3_resonance, energy_pattern, phi_resonance, cyclic_coherence
+            phase_shifts, position_resonance, energy_pattern, phi_resonance, cyclic_coherence
         )
         
         result = {
             'detected': meta_signature['detected'],
             'confidence': meta_signature['confidence'],
+            'cycle': cycle,
+            'recursion_order': recursion_order,
+            'meta_position': meta_position,
             'phase_shift_pattern': phase_shifts,
-            'position3_resonance': position3_resonance,
+            'position_resonance': position_resonance,
             'energy_pattern': energy_pattern,
             'phi_resonance': phi_resonance,
             'cyclic_coherence': cyclic_coherence,
             'meta_signature': meta_signature,
-            'tick_range': (cycle6_positions[0]['tick'], cycle6_positions[-1]['tick'])
+            'tick_range': (cycle_positions[0]['tick'], cycle_positions[-1]['tick'])
         }
         
         if result['detected']:
-            logger.info(f"Meta-transition detected at cycle 6 with confidence {result['confidence']:.4f}")
+            logger.info(f"Meta-transition detected at cycle {cycle} (order {recursion_order}, " +
+                       f"meta-position {meta_position}) with confidence {result['confidence']:.4f}")
             logger.info(f"Ticks: {result['tick_range'][0]} to {result['tick_range'][1]}")
         
         return result
     
-    def predict_metacycle_evolution(self, current_order: int) -> Dict:
+    def predict_metacycle_evolution(self, current_order: int, max_prediction_order: int = 5) -> Dict:
         """
         Predict the evolution of meta-patterns into higher orders.
         
         Args:
             current_order: Current meta-pattern order observed
+            max_prediction_order: Maximum order to predict
             
         Returns:
             Prediction dictionary
         """
-        # This is a placeholder for future implementation
-        # Will predict emergence of higher-order patterns based on current observations
-        next_meta3_cycle = 3 * (2 ** current_order)
-        next_meta6_cycle = 6 * (2 ** current_order)
-        next_meta9_cycle = 9 * (2 ** current_order)
+        predictions = {}
+        
+        for order in range(current_order + 1, max_prediction_order + 1):
+            meta3_cycle = self._calculate_meta_position_cycle(3, order)
+            meta6_cycle = self._calculate_meta_position_cycle(6, order)
+            meta9_cycle = self._calculate_meta_position_cycle(9, order)
+            
+            predictions[order] = {
+                'meta3_cycle': meta3_cycle,
+                'meta6_cycle': meta6_cycle,
+                'meta9_cycle': meta9_cycle,
+                'confidence': 0.8 / (order - current_order + 1)  # Confidence decreases with distance
+            }
+        
+        # Calculate overall prediction confidence
+        overall_confidence = sum(p['confidence'] for p in predictions.values()) / len(predictions)
         
         return {
-            'next_order': current_order + 1,
-            'predicted_cycles': {
-                'meta3': next_meta3_cycle,
-                'meta6': next_meta6_cycle,
-                'meta9': next_meta9_cycle
-            },
-            'confidence': 0.8 / (current_order + 1)  # Confidence decreases with higher orders
+            'current_order': current_order,
+            'max_prediction_order': max_prediction_order,
+            'predictions': predictions,
+            'overall_confidence': overall_confidence
         }
+    
+    def get_detected_pattern_summary(self) -> Dict:
+        """
+        Get a summary of all detected patterns at different recursion orders.
+        
+        Returns:
+            Summary dictionary with metrics for all recursion orders
+        """
+        summary = {
+            'highest_detected_order': 0,
+            'total_patterns_detected': 0,
+            'orders_with_patterns': [],
+            'order_strengths': {},
+            'propagation_delays': {}
+        }
+        
+        # Count total patterns and find highest order
+        total_patterns = 0
+        highest_order = 0
+        orders_with_patterns = []
+        
+        for order, data in self.detected_meta_patterns.items():
+            if data['patterns_detected'] > 0:
+                total_patterns += data['patterns_detected']
+                orders_with_patterns.append(order)
+                if order > highest_order:
+                    highest_order = order
+        
+        summary['highest_detected_order'] = highest_order
+        summary['total_patterns_detected'] = total_patterns
+        summary['orders_with_patterns'] = sorted(orders_with_patterns)
+        
+        # Calculate average strength by order
+        for order, data in self.detected_meta_patterns.items():
+            if data['cross_scale_correlations']:
+                strengths = []
+                for corr_data in data['cross_scale_correlations'].values():
+                    avg_corr = (corr_data['meta3'] + corr_data['meta6'] + corr_data['meta9']) / 3
+                    strengths.append(avg_corr)
+                
+                if strengths:
+                    summary['order_strengths'][order] = np.mean(strengths)
+        
+        # Include propagation delays
+        if self.pattern_propagation:
+            summary['propagation_delays'] = {
+                str(order_pair): np.mean(delays) 
+                for order_pair, delays in self.pattern_propagation.items()
+            }
+        
+        return summary
+    
+    def _calculate_meta_position_cycle(self, position: int, order: int) -> int:
+        """
+        Calculate which cycle corresponds to a meta-position at a given order.
+        
+        Args:
+            position: Base position (3, 6, or 9)
+            order: Recursion order (1=base level, 2=meta, 3=meta-meta, etc.)
+            
+        Returns:
+            Cycle number
+        """
+        if order < 1:
+            logger.warning(f"Invalid recursion order: {order}, using 1 instead")
+            order = 1
+            
+        if position not in [3, 6, 9]:
+            logger.warning(f"Invalid position: {position}, must be 3, 6, or 9")
+            return 0
+            
+        # The formula is: Meta₍ₙ₎(position) = Cycle(position × 2ⁿ⁻¹)
+        return position * (2 ** (order - 1))
+    
+    def _determine_meta_position(self, cycle: int, order: int) -> int:
+        """
+        Determine which meta-position a cycle represents at a given order.
+        
+        Args:
+            cycle: Cycle number
+            order: Recursion order
+            
+        Returns:
+            Base position (3, 6, or 9) or 0 if not a meta-position
+        """
+        for position in [3, 6, 9]:
+            if cycle == self._calculate_meta_position_cycle(position, order):
+                return position
+                
+        return 0  # Not a meta-position at this order
+    
+    def _get_meta_position_data(self, 
+                               position_history: Dict[int, List[Dict]], 
+                               position: int, 
+                               order: int) -> List[Dict]:
+        """
+        Get data for a meta-position at a specified order.
+        
+        Args:
+            position_history: Dictionary of position history by recursion depth
+            position: Position number (3, 6, or 9)
+            order: Recursion order (1=base level, 2=meta, etc.)
+            
+        Returns:
+            List of position data dictionaries
+        """
+        if order <= 0:
+            # Order 0 doesn't exist, interpret as requesting the original position
+            return self._extract_position_data(position_history, position)
+            
+        if order == 1:
+            # Order 1 is the base level
+            return self._extract_position_data(position_history, position)
+            
+        # For higher orders, get the corresponding cycle
+        cycle = self._calculate_meta_position_cycle(position, order)
+        return self._extract_cycle_positions(position_history, cycle)
+    
+    def _analyze_base_pattern(self, position_history: Dict[int, List[Dict]]) -> Dict:
+        """
+        Analyze the base level 3-6-9 pattern (recursion order 1).
+        
+        Args:
+            position_history: Dictionary of position history by recursion depth
+            
+        Returns:
+            Dictionary with base pattern metrics
+        """
+        # Extract position data for positions 3, 6, and 9
+        pos3_data = self._extract_position_data(position_history, 3)
+        pos6_data = self._extract_position_data(position_history, 6)
+        pos9_data = self._extract_position_data(position_history, 9)
+        
+        # Calculate phase coherence for each position
+        pos3_coherence = self._calculate_phase_coherence(pos3_data)
+        pos6_coherence = self._calculate_phase_coherence(pos6_data)
+        pos9_coherence = self._calculate_phase_coherence(pos9_data)
+        
+        # Calculate correlations between positions
+        pos3_pos6_correlation = self._calculate_meta_correlation(pos3_data, pos6_data)
+        pos6_pos9_correlation = self._calculate_meta_correlation(pos6_data, pos9_data)
+        pos3_pos9_correlation = self._calculate_meta_correlation(pos3_data, pos9_data)
+        
+        # Calculate overall pattern strength
+        pattern_strength = (pos3_coherence + pos6_coherence + pos9_coherence) / 3
+        correlation_strength = (pos3_pos6_correlation + pos6_pos9_correlation + pos3_pos9_correlation) / 3
+        overall_strength = 0.6 * pattern_strength + 0.4 * correlation_strength
+        
+        # Check if base pattern is detected
+        is_detected = overall_strength > self.correlation_threshold
+        
+        return {
+            'detected': is_detected,
+            'recursion_order': 1,
+            'pattern_strength': overall_strength,
+            'pos3_coherence': pos3_coherence,
+            'pos6_coherence': pos6_coherence,
+            'pos9_coherence': pos9_coherence,
+            'pos3_pos6_correlation': pos3_pos6_correlation,
+            'pos6_pos9_correlation': pos6_pos9_correlation,
+            'pos3_pos9_correlation': pos3_pos9_correlation,
+            'pos3_data': {
+                'count': len(pos3_data),
+                'energy_pattern': self._extract_energy_pattern(pos3_data)
+            },
+            'pos6_data': {
+                'count': len(pos6_data),
+                'energy_pattern': self._extract_energy_pattern(pos6_data)
+            },
+            'pos9_data': {
+                'count': len(pos9_data),
+                'energy_pattern': self._extract_energy_pattern(pos9_data)
+            }
+        }
+    
+    def _analyze_pattern_propagation(self, all_results: Dict[int, Dict]) -> None:
+        """
+        Analyze how patterns propagate between recursion levels.
+        
+        Args:
+            all_results: Dictionary of detection results by recursion order
+        """
+        # Reset propagation data
+        self.pattern_propagation = defaultdict(list)
+        
+        # Skip if we don't have at least two levels of patterns
+        detected_orders = [order for order, result in all_results.items() if result.get('detected', False)]
+        if len(detected_orders) < 2:
+            return
+            
+        # Sort orders
+        detected_orders.sort()
+        
+        # Calculate delays between consecutive orders
+        for i in range(len(detected_orders) - 1):
+            lower_order = detected_orders[i]
+            higher_order = detected_orders[i + 1]
+            
+            # Get the tick ranges for pattern detection
+            lower_tick_range = self._get_earliest_detection_tick(all_results[lower_order])
+            higher_tick_range = self._get_earliest_detection_tick(all_results[higher_order])
+            
+            if lower_tick_range and higher_tick_range:
+                # Calculate propagation delay
+                propagation_delay = higher_tick_range - lower_tick_range
+                
+                # Store the propagation delay
+                self.pattern_propagation[(lower_order, higher_order)].append(propagation_delay)
+                
+                logger.info(f"Pattern propagation from order {lower_order} to {higher_order} " +
+                           f"took {propagation_delay} ticks")
+    
+    def _get_earliest_detection_tick(self, result: Dict) -> Optional[int]:
+        """
+        Get the earliest tick when a pattern was detected.
+        
+        Args:
+            result: Pattern detection result dictionary
+            
+        Returns:
+            Earliest tick or None if not available
+        """
+        # For recursion order 1 (base level)
+        if result.get('recursion_order') == 1:
+            # Use the earliest tick from positions 3, 6, 9
+            ticks = []
+            for pos in ['pos3', 'pos6', 'pos9']:
+                data = result.get(f'{pos}_data', {})
+                if 'energy_pattern' in data and data['energy_pattern']:
+                    ticks.append(min(range(len(data['energy_pattern']))))
+            
+            return min(ticks) if ticks else None
+        
+        # For higher recursion orders
+        for meta_pos in ['meta3', 'meta6', 'meta9']:
+            data = result.get(f'{meta_pos}_data', {})
+            if data and 'energy_pattern' in data and data['energy_pattern']:
+                if 'tick_range' in result:
+                    return result['tick_range'][0]  # Start of tick range
+                    
+        return None
     
     def _extract_cycle_positions(self, position_history: Dict[int, List[Dict]], cycle: int) -> List[Dict]:
         """
