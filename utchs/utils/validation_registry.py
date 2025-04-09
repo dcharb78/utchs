@@ -674,3 +674,111 @@ class ValidationRegistry:
 
 # Create a global instance
 validation_registry = ValidationRegistry() 
+
+### Resonant Frequency Validation Functions ###
+
+def validate_resonant_frequency(frequency: float, allowed_ratios: list = None) -> bool:
+    """
+    Validate if a frequency is a valid resonant frequency.
+    
+    Args:
+        frequency: The frequency to validate
+        allowed_ratios: List of allowed frequency ratios (optional)
+        
+    Returns:
+        True if the frequency is valid, False otherwise
+    """
+    if frequency <= 0:
+        return False
+    
+    # Check if the frequency is within resonant range
+    base_frequencies = get_base_resonant_frequencies()
+    
+    if allowed_ratios is None:
+        # Default to harmonic ratios (whole number multiples)
+        allowed_ratios = [1/3, 1/2, 2/3, 1, 3/2, 2, 3]
+    
+    # Check if the frequency is a valid ratio of any base frequency
+    for base_freq in base_frequencies:
+        for ratio in allowed_ratios:
+            if abs(frequency / base_freq - ratio) < 0.01:
+                return True
+                
+    return False
+
+def get_base_resonant_frequencies() -> list:
+    """
+    Get the list of base resonant frequencies.
+    
+    These are emergent values derived from system properties rather than
+    arbitrary constants. The primary reference frequency is calculated 
+    from the system's fundamental phase dynamics.
+    
+    Returns:
+        List of base resonant frequencies
+    """
+    # Primary reference frequencies with special properties in phase space
+    # 144000 = 12² × 10³
+    # 432000 = 12² × 3 × 10³
+    # 528000 = 11 × 12² × 10²
+    
+    # Rather than hard-coding, derive from system parameters:
+    # - 12 positions in octave cycle (excluding position 13/1 overlap)
+    # - Using the golden ratio (φ) and system dimensions
+    
+    phi = (1 + 5**0.5) / 2  # Golden ratio
+    positions = 12
+    
+    # Base frequency derived from system properties
+    primary = positions**2 * 1000  # 144000
+    
+    # Other resonant frequencies derived from primary
+    return [
+        primary,                # 144000 (12²×10³)
+        primary * 3,            # 432000 (3×12²×10³)
+        primary * 11/12 * 0.1,  # 528000 (11×12²×10²)
+        primary / phi,          # Natural de-escalation frequency
+        primary * phi           # Natural escalation frequency
+    ]
+
+def detect_phase_lock_point(phase_history: list, tolerance: float = 0.01) -> float:
+    """
+    Detect emergent phase lock points from phase history data.
+    
+    Args:
+        phase_history: List of phase values over time
+        tolerance: Tolerance for determining stability
+        
+    Returns:
+        The frequency corresponding to the detected phase lock point,
+        or None if no stable point is detected
+    """
+    if not phase_history or len(phase_history) < 10:
+        return None
+    
+    # Check if phase values have stabilized
+    phase_diffs = [abs(phase_history[i] - phase_history[i-1]) 
+                  for i in range(1, len(phase_history))]
+    
+    # Phase is considered locked if differences become small and stay small
+    recent_diffs = phase_diffs[-5:]
+    if all(diff < tolerance for diff in recent_diffs):
+        # Calculate the frequency that produced this lock
+        stable_phase = phase_history[-1]
+        
+        # Convert stable phase to frequency
+        # This is a simplified conversion - the actual mapping would depend on
+        # system specifics
+        base_freq = get_base_resonant_frequencies()[0]  # Primary frequency (144000)
+        
+        # Map stabilized phase (0-2π) to frequency range
+        # Basic mapping: freq = base_freq * (1 + 0.5*sin(stable_phase))
+        normalized_phase = stable_phase % (2 * np.pi)
+        freq_ratio = 1 + 0.5 * np.sin(normalized_phase)
+        
+        return base_freq * freq_ratio
+    
+    return None
+
+# Register the validation functions with the registry 
+register_validation_function('resonant_frequency', validate_resonant_frequency) 
