@@ -39,8 +39,8 @@ class RecursionIntegrator:
         self.config = config or {}
         self.system = system
         
-        # Create recursion tracker
-        self.recursion_tracker = RecursionTracker(self.config)
+        # Create recursion tracker using singleton pattern
+        self.recursion_tracker = RecursionTracker.get_instance(self.config)
         
         # Create analyzers
         self.transition_analyzer = TransitionAnalyzer(self.recursion_tracker, self.config)

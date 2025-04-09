@@ -15,7 +15,7 @@ import numpy.typing as npt
 
 from ..core.position import Position
 from ..core.torus import Torus
-from ..math.phase_field import PhaseField
+from ..mathematics.phase_field import PhaseField
 from ..fields.energy_field import EnergyField
 from ..utils.logging_config import configure_logging, get_logger, SystemError, ConfigurationError
 
@@ -123,11 +123,17 @@ class UTCHSSystem:
         os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, "utchs_simulation.log")
         
-        return configure_logging(
-            name="utchs.system",
+        # Configure logging without 'name' parameter
+        config = configure_logging(
             log_level=self.config.get('log_level', 'INFO'),
-            log_file=log_file
+            log_file=log_file,
+            console_output=True,
+            file_output=True,
+            log_dir=log_dir
         )
+        
+        # Get logger with the specific name
+        return config.get_logger("utchs.system")
 
     def advance_tick(self) -> Dict:
         """
@@ -320,13 +326,105 @@ class UTCHSSystem:
             # Calculate total energy level
             self.energy_level = self.energy_field.calculate_total_energy()
             
+            # Check for 7th cycle transformation
+            self._check_for_seventh_cycle_transformation()
+            
             # Log significant changes
-            if self.current_tick % 100 == 0 or abs(self.global_coherence - self.state_history[-1]['global_coherence']) > 0.1:
+            if (self.current_tick % 100 == 0 or 
+                (self.state_history and 
+                 'metrics' in self.state_history[-1] and 
+                 'global_coherence' in self.state_history[-1]['metrics'] and
+                 abs(self.global_coherence - self.state_history[-1]['metrics']['global_coherence']) > 0.1)):
                 self.logger.info(f"System metrics - Coherence: {self.global_coherence:.4f}, Stability: {self.global_stability:.4f}, Energy: {self.energy_level:.4f}, Recursion Depth: {self.phase_recursion_depth}")
                 
         except Exception as e:
             self.logger.error(f"Error updating system metrics: {str(e)}")
             raise SystemError(f"System metrics update failed: {str(e)}") from e
+
+    def _check_for_seventh_cycle_transformation(self) -> None:
+        """
+        Check if the system is experiencing the 7th cycle transformation.
+        This is a critical point where Position 13 undergoes a significant transformation
+        and the system folds back into itself to create larger structures.
+        """
+        # Get current hierarchy position
+        current_torus = self.tori[self.current_torus_idx]
+        current_structure = current_torus.get_current_structure()
+        current_cycle = current_structure.get_current_cycle()
+        
+        # Check if we're at cycle 7
+        if current_cycle.id == 7:
+            # Check if we're at Position 13
+            current_position = current_cycle.get_current_position()
+            if current_position.number == 13:
+                self.logger.info("SEVENTH CYCLE TRANSFORMATION DETECTED: Position 13 at Cycle 7")
+                
+                # Analyze P13 transformation metrics
+                if len(self.state_history) > 13:  # Need history to compare
+                    # Get previous P13 state from cycle 6
+                    previous_p13_states = [
+                        state for state in self.state_history[-100:] 
+                        if ('hierarchy' in state and 
+                            'cycle' in state['hierarchy'] and 
+                            state['hierarchy']['cycle'] == 6 and
+                            'position' in state and 
+                            'number' in state['position'] and
+                            state['position']['number'] == 13)
+                    ]
+                    
+                    if previous_p13_states:
+                        # Get most recent previous P13 state
+                        prev_p13_state = previous_p13_states[-1]
+                        
+                        # Calculate transformation metrics
+                        phase_shift = current_position.phase - prev_p13_state['position']['phase']
+                        amplitude_ratio = current_position.energy_level / prev_p13_state['position']['energy']
+                        
+                        # Calculate the golden ratio relationship
+                        phi = 1.618034
+                        phi_resonance = abs(abs(phase_shift) - (1/phi)) < 0.1 or abs(amplitude_ratio - phi) < 0.2
+                        
+                        self.logger.info(f"P13 Transformation Metrics - Phase Shift: {phase_shift:.4f}, Amplitude Ratio: {amplitude_ratio:.4f}")
+                        self.logger.info(f"Golden Ratio Resonance Detected: {phi_resonance}")
+                        
+                        # Store transformation metrics
+                        if not hasattr(self, 'p13_transformations'):
+                            self.p13_transformations = []
+                            
+                        self.p13_transformations.append({
+                            'tick': self.current_tick,
+                            'phase_shift': phase_shift,
+                            'amplitude_ratio': amplitude_ratio,
+                            'phi_resonance': phi_resonance,
+                            'cycle': current_cycle.id,
+                            'structure': current_structure.id,
+                            'torus': current_torus.id
+                        })
+                        
+                        # Implement special handling for the transformation
+                        if phi_resonance:
+                            # Boost energy at all positions to facilitate the transformation
+                            self._boost_all_positions_energy()
+                            
+                            # Update recursion depth to acknowledge the transformation
+                            self.phase_recursion_depth += 1
+                            
+                            self.logger.info(f"7th Cycle Φ-Transformation complete. New recursion depth: {self.phase_recursion_depth}")
+
+    def _boost_all_positions_energy(self) -> None:
+        """
+        Boost energy at all positions during the 7th cycle transformation.
+        This facilitates the system's transition to a higher organizational state.
+        """
+        boost_factor = 1.618034  # Golden ratio
+        
+        for torus in self.tori:
+            for structure in torus.structures:
+                for cycle in structure.cycles:
+                    for position in cycle.positions:
+                        position.energy_level *= boost_factor
+                        
+        self.logger.info(f"All positions energy boosted by factor {boost_factor} for 7th cycle transformation")
 
     def _record_state(self) -> Dict:
         """
@@ -890,3 +988,52 @@ class UTCHSSystem:
             return [array_like]  # For scalars, return as single item list
         except Exception as e:
             raise e
+
+    def analyze_meta_patterns(self, max_recursion_order: int = 5) -> Dict:
+        """
+        Analyze meta-patterns in the system using the meta-pattern detector.
+        
+        Args:
+            max_recursion_order: Maximum recursion order to analyze
+            
+        Returns:
+            Dictionary with meta-pattern analysis results
+        """
+        try:
+            # Get current system state for nonlinear corrections
+            system_state = {
+                'global_coherence': self.global_coherence,
+                'global_stability': self.global_stability,
+                'energy_level': self.energy_level,
+                'phase_recursion_depth': self.phase_recursion_depth,
+                'energy_stability': self.energy_field.get_peak_energy() / max(self.energy_field.calculate_total_energy(), 1e-10),
+                'phase_stability': getattr(self.phase_field, 'calculate_torsion_stability', lambda: 0.5)()
+            }
+            
+            # Get position history from recursion tracker
+            from .recursion_tracker import RecursionTracker
+            recursion_tracker = RecursionTracker.get_instance()
+            position_history = recursion_tracker.get_position_history()
+            
+            # Create meta-pattern detector
+            from .meta_pattern_detector import MetaPatternDetector
+            detector = MetaPatternDetector(config={'max_recursion_order': max_recursion_order})
+            
+            # Detect meta-patterns with nonlinear corrections
+            meta_patterns = detector.detect_all_meta_patterns(position_history, system_state=system_state)
+            
+            # Log results
+            detected_orders = [order for order, result in meta_patterns.items() 
+                              if result.get('detected', False)]
+            
+            self.logger.info(f"Meta-pattern analysis completed. Detected at orders: {detected_orders}")
+            
+            return {
+                'meta_patterns': meta_patterns,
+                'detected_orders': detected_orders,
+                'max_order_detected': max(detected_orders) if detected_orders else 0
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing meta-patterns: {str(e)}")
+            return {'error': str(e)}

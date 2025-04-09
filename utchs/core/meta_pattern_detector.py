@@ -14,6 +14,9 @@ from scipy.stats import entropy
 from scipy.signal import correlate
 
 from ..utils.logging_config import get_logger
+from ..mathematics.recursion_scaling import get_correction_factor
+from ..core.phase_lock import torsional_phase_lock
+from ..core.coherence_gate import coherence_gate
 
 logger = get_logger(__name__)
 
@@ -63,7 +66,8 @@ class MetaPatternDetector:
     def detect_meta_patterns(self, 
                              position_history: Dict[int, List[Dict]], 
                              recursion_order: int = 2,
-                             config: Optional[Dict[str, Any]] = None) -> Dict:
+                             config: Optional[Dict[str, Any]] = None,
+                             system_state: Optional[Dict[str, Any]] = None) -> Dict:
         """
         Detect meta-patterns in position history data at a specific recursion order.
         
@@ -71,16 +75,17 @@ class MetaPatternDetector:
             position_history: Dictionary of position history by recursion depth
             recursion_order: Order of meta-pattern to detect (2=cycle 6 as meta-3, etc.)
             config: Configuration dictionary (optional)
+            system_state: Optional system state for adaptive corrections
             
         Returns:
             Dictionary with meta-pattern metrics
         """
         config = config or self.config
         
-        # Calculate meta-positions for this recursion order
-        meta3_cycle = self._calculate_meta_position_cycle(3, recursion_order)
-        meta6_cycle = self._calculate_meta_position_cycle(6, recursion_order)
-        meta9_cycle = self._calculate_meta_position_cycle(9, recursion_order)
+        # Calculate meta-positions for this recursion order using nonlinear correction
+        meta3_cycle = self._calculate_meta_position_cycle(3, recursion_order, system_state)
+        meta6_cycle = self._calculate_meta_position_cycle(6, recursion_order, system_state)
+        meta9_cycle = self._calculate_meta_position_cycle(9, recursion_order, system_state)
         
         logger.debug(f"Detecting meta-patterns at recursion order {recursion_order} " +
                     f"with cycles: {meta3_cycle}, {meta6_cycle}, {meta9_cycle}")
@@ -95,6 +100,34 @@ class MetaPatternDetector:
         original_position6 = self._get_meta_position_data(position_history, 6, recursion_order-1)
         original_position9 = self._get_meta_position_data(position_history, 9, recursion_order-1)
         
+        # Apply torsional phase-locking if configured
+        if config.get('enable_phase_locking', True) and recursion_order > 1:
+            # Create position data structure for phase-locking
+            position_data = {
+                recursion_order-1: {
+                    3: {'phase': self._get_average_phase(original_position3)},
+                    6: {'phase': self._get_average_phase(original_position6)},
+                    9: {'phase': self._get_average_phase(original_position9)}
+                },
+                recursion_order: {
+                    3: {'phase': self._get_average_phase(meta3_positions)},
+                    6: {'phase': self._get_average_phase(meta6_positions)},
+                    9: {'phase': self._get_average_phase(meta9_positions)}
+                }
+            }
+            
+            # Apply phase-locking between recursion levels
+            position_data = torsional_phase_lock.align_recursion_levels(
+                position_data, recursion_order-1, recursion_order
+            )
+            
+            # Update meta-positions with phase-locked values
+            self._update_positions_phase(meta3_positions, position_data[recursion_order][3]['phase'])
+            self._update_positions_phase(meta6_positions, position_data[recursion_order][6]['phase'])
+            self._update_positions_phase(meta9_positions, position_data[recursion_order][9]['phase'])
+            
+            logger.debug(f"Applied phase-locking for recursion order {recursion_order}")
+        
         # Calculate correlations between meta-positions and their "originals"
         meta3_correlation = self._calculate_meta_correlation(original_position3, meta3_positions)
         meta6_correlation = self._calculate_meta_correlation(original_position6, meta6_positions)
@@ -104,6 +137,54 @@ class MetaPatternDetector:
         meta_cycle_strength = self._calculate_meta_cycle_strength(
             meta3_correlation, meta6_correlation, meta9_correlation
         )
+        
+        # Calculate phase coherence for each meta-position
+        meta3_phase_coherence = self._calculate_phase_coherence(meta3_positions)
+        meta6_phase_coherence = self._calculate_phase_coherence(meta6_positions)
+        meta9_phase_coherence = self._calculate_phase_coherence(meta9_positions)
+        
+        # Calculate energy coherence for each meta-position
+        meta3_energy_coherence = self._calculate_energy_coherence(meta3_positions)
+        meta6_energy_coherence = self._calculate_energy_coherence(meta6_positions)
+        meta9_energy_coherence = self._calculate_energy_coherence(meta9_positions)
+        
+        # Calculate temporal coherence for temporal stability
+        meta3_temporal_coherence = self._calculate_temporal_coherence(meta3_positions)
+        meta6_temporal_coherence = self._calculate_temporal_coherence(meta6_positions)
+        meta9_temporal_coherence = self._calculate_temporal_coherence(meta9_positions)
+        
+        # Create pattern data for coherence gating
+        meta3_pattern_data = {
+            'phase_coherence': meta3_phase_coherence,
+            'energy_coherence': meta3_energy_coherence,
+            'temporal_coherence': meta3_temporal_coherence
+        }
+        
+        meta6_pattern_data = {
+            'phase_coherence': meta6_phase_coherence,
+            'energy_coherence': meta6_energy_coherence,
+            'temporal_coherence': meta6_temporal_coherence
+        }
+        
+        meta9_pattern_data = {
+            'phase_coherence': meta9_phase_coherence,
+            'energy_coherence': meta9_energy_coherence,
+            'temporal_coherence': meta9_temporal_coherence
+        }
+        
+        # Apply coherence gating if configured
+        if config.get('enable_coherence_gating', True):
+            meta3_coherent = coherence_gate.is_coherent(meta3_pattern_data, recursion_order)
+            meta6_coherent = coherence_gate.is_coherent(meta6_pattern_data, recursion_order)
+            meta9_coherent = coherence_gate.is_coherent(meta9_pattern_data, recursion_order)
+            
+            # Update meta-pattern strength based on coherence gating
+            if not (meta3_coherent and meta6_coherent and meta9_coherent):
+                logger.debug(f"Coherence gate rejected pattern at recursion order {recursion_order} " +
+                           f"(meta3: {meta3_coherent}, meta6: {meta6_coherent}, meta9: {meta9_coherent})")
+                meta_cycle_strength *= 0.5  # Reduce strength for patterns failing coherence gate
+        else:
+            meta3_coherent = meta6_coherent = meta9_coherent = True
         
         # Check if we have a valid meta-pattern at this recursion order
         has_meta_pattern = meta_cycle_strength > config.get('meta_pattern_threshold', 0.7)
@@ -121,18 +202,27 @@ class MetaPatternDetector:
             'meta9_correlation': meta9_correlation,
             'meta3_data': {
                 'count': len(meta3_positions),
-                'phase_coherence': self._calculate_phase_coherence(meta3_positions),
-                'energy_pattern': self._extract_energy_pattern(meta3_positions)
+                'phase_coherence': meta3_phase_coherence,
+                'energy_coherence': meta3_energy_coherence,
+                'temporal_coherence': meta3_temporal_coherence,
+                'energy_pattern': self._extract_energy_pattern(meta3_positions),
+                'coherent': meta3_coherent
             },
             'meta6_data': {
                 'count': len(meta6_positions),
-                'phase_coherence': self._calculate_phase_coherence(meta6_positions),
-                'energy_pattern': self._extract_energy_pattern(meta6_positions)
+                'phase_coherence': meta6_phase_coherence,
+                'energy_coherence': meta6_energy_coherence,
+                'temporal_coherence': meta6_temporal_coherence,
+                'energy_pattern': self._extract_energy_pattern(meta6_positions),
+                'coherent': meta6_coherent
             },
             'meta9_data': {
                 'count': len(meta9_positions),
-                'phase_coherence': self._calculate_phase_coherence(meta9_positions),
-                'energy_pattern': self._extract_energy_pattern(meta9_positions)
+                'phase_coherence': meta9_phase_coherence,
+                'energy_coherence': meta9_energy_coherence,
+                'temporal_coherence': meta9_temporal_coherence,
+                'energy_pattern': self._extract_energy_pattern(meta9_positions),
+                'coherent': meta9_coherent
             }
         }
         
@@ -255,12 +345,13 @@ class MetaPatternDetector:
         
         return result
     
-    def detect_all_meta_patterns(self, position_history: Dict[int, List[Dict]]) -> Dict[int, Dict]:
+    def detect_all_meta_patterns(self, position_history: Dict[int, List[Dict]], system_state: Optional[Dict[str, Any]] = None) -> Dict[int, Dict]:
         """
         Detect meta-patterns at all recursion orders up to max_recursion_order.
         
         Args:
             position_history: Dictionary of position history by recursion depth
+            system_state: Optional system state for adaptive corrections
             
         Returns:
             Dictionary of meta-pattern results by recursion order
@@ -273,7 +364,7 @@ class MetaPatternDetector:
         
         # Then detect higher-order meta-patterns
         for order in range(2, self.max_recursion_order + 1):
-            result = self.detect_meta_patterns(position_history, order)
+            result = self.detect_meta_patterns(position_history, order, system_state=system_state)
             all_results[order] = result
             
             # If we don't detect a pattern at this level, unlikely to find at higher levels
@@ -453,13 +544,14 @@ class MetaPatternDetector:
         
         return summary
     
-    def _calculate_meta_position_cycle(self, position: int, order: int) -> int:
+    def _calculate_meta_position_cycle(self, position: int, order: int, system_state: Optional[Dict[str, Any]] = None) -> int:
         """
         Calculate which cycle corresponds to a meta-position at a given order.
         
         Args:
             position: Base position (3, 6, or 9)
             order: Recursion order (1=base level, 2=meta, 3=meta-meta, etc.)
+            system_state: Optional system state for adaptive corrections
             
         Returns:
             Cycle number
@@ -472,8 +564,29 @@ class MetaPatternDetector:
             logger.warning(f"Invalid position: {position}, must be 3, 6, or 9")
             return 0
             
-        # The formula is: Meta₍ₙ₎(position) = Cycle(position × 2ⁿ⁻¹)
-        return position * (2 ** (order - 1))
+        # The formula is: Meta₍ₙ₎(position) = Cycle(position × 2ⁿ⁻¹ × f(n))
+        # where f(n) is a nonlinear correction function
+        
+        # Base calculation (original linear model)
+        base_cycle = position * (2 ** (order - 1))
+        
+        # No correction needed for lower orders
+        if order <= 2:
+            return base_cycle
+        
+        # Apply nonlinear correction for higher recursion orders
+        correction_factor = get_correction_factor(order, system_state)
+        
+        # Calculate corrected cycle number
+        corrected_cycle = int(base_cycle * correction_factor)
+        
+        # Ensure minimum valid cycle (can't be less than the position itself)
+        corrected_cycle = max(corrected_cycle, position)
+        
+        logger.debug(f"Meta-position {position} at order {order}: base cycle {base_cycle}, " +
+                   f"corrected cycle {corrected_cycle} (correction: {correction_factor:.4f})")
+        
+        return corrected_cycle
     
     def _determine_meta_position(self, cycle: int, order: int) -> int:
         """
@@ -1080,4 +1193,130 @@ class MetaPatternDetector:
                 'phi_score': float(phi_score)
             },
             'strong_indicators': strong_indicators
-        } 
+        }
+    
+    def _get_average_phase(self, positions: List[Dict]) -> complex:
+        """
+        Calculate the average phase for a list of positions.
+        
+        Args:
+            positions: List of position data dictionaries
+            
+        Returns:
+            Average phase as a complex number
+        """
+        if not positions:
+            return complex(0, 0)
+        
+        # Extract phases
+        phases = [p.get('phase', 0) for p in positions if 'phase' in p]
+        
+        if not phases:
+            return complex(0, 0)
+        
+        # Convert to complex numbers on the unit circle
+        complex_phases = np.exp(1j * np.array(phases))
+        
+        # Calculate mean vector
+        mean_vector = np.mean(complex_phases)
+        
+        return mean_vector
+    
+    def _update_positions_phase(self, positions: List[Dict], target_phase: complex) -> None:
+        """
+        Update the phase values of positions with a target phase.
+        
+        Args:
+            positions: List of position data dictionaries to update
+            target_phase: Target phase as a complex number
+        """
+        if not positions or abs(target_phase) < 1e-10:
+            return
+        
+        # Get target phase angle
+        target_angle = np.angle(target_phase)
+        
+        # Update phases
+        for pos in positions:
+            if 'phase' in pos:
+                pos['phase'] = target_angle
+    
+    def _calculate_energy_coherence(self, positions: List[Dict]) -> float:
+        """
+        Calculate energy coherence for a set of positions.
+        
+        Args:
+            positions: List of position data dictionaries
+            
+        Returns:
+            Energy coherence value (0.0-1.0)
+        """
+        if not positions or len(positions) < 3:
+            return 0.0
+        
+        # Extract energy values
+        energy_values = [p.get('energy_level', 0) for p in positions if 'energy_level' in p]
+        
+        if not energy_values:
+            return 0.0
+        
+        # Calculate statistics
+        energy_mean = np.mean(energy_values)
+        energy_std = np.std(energy_values)
+        
+        if energy_mean == 0:
+            return 0.0
+        
+        # Coefficient of variation (lower is more coherent)
+        cv = energy_std / energy_mean
+        
+        # Map to [0, 1] range, lower CV means higher coherence
+        coherence = 1.0 / (1.0 + cv)
+        
+        # Normalize coherence to [0, 1]
+        coherence = min(max(coherence, 0.0), 1.0)
+        
+        return float(coherence)
+    
+    def _calculate_temporal_coherence(self, positions: List[Dict]) -> float:
+        """
+        Calculate temporal coherence for a set of positions.
+        
+        Args:
+            positions: List of position data dictionaries
+            
+        Returns:
+            Temporal coherence value (0.0-1.0)
+        """
+        if not positions or len(positions) < 3:
+            return 0.0
+        
+        # Sort by tick
+        sorted_positions = sorted(positions, key=lambda p: p.get('tick', 0))
+        
+        # Extract ticks
+        ticks = [p.get('tick', 0) for p in sorted_positions if 'tick' in p]
+        
+        if not ticks or len(ticks) < 3:
+            return 0.0
+        
+        # Calculate tick intervals
+        intervals = np.diff(ticks)
+        
+        # Calculate statistics
+        interval_mean = np.mean(intervals)
+        interval_std = np.std(intervals)
+        
+        if interval_mean == 0:
+            return 0.0
+        
+        # Coefficient of variation (lower is more coherent)
+        cv = interval_std / interval_mean
+        
+        # Map to [0, 1] range, lower CV means higher coherence
+        coherence = 1.0 / (1.0 + cv)
+        
+        # Normalize coherence to [0, 1]
+        coherence = min(max(coherence, 0.0), 1.0)
+        
+        return float(coherence) 
